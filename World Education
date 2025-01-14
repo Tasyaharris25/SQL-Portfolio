@@ -1,0 +1,87 @@
+--create column in the table 
+alter table world_education 
+add column country varchar(100),
+add column country_code varchar(20),
+add column year integer,
+add column gov_exp_pct_gdp decimal,
+add column lit_rate_adult_pct decimal,
+add column pri_comp_rate_pct decimal,
+add column pupil_teacher_primary decimal,
+add column pupil_teacher_secondary decimal,
+add column school_enrol_primary_pct decimal,
+add column school_enrol_secondary_pct decimal,
+add column school_enrol_tertiary_pct decimal;
+
+--importing data from the dataset
+COPY world_education
+FROM 'C:\Users\Public\world_education.csv'
+DELIMITER ','
+CSV HEADER;
+
+--identify duplicates
+select country, country_code, year, count(*) as duplicate_count
+from world_education
+group by country, country_code, year 
+having count(*) > 1
+
+--there are no duplicate data in this table
+
+-- handle missing values 
+delete from world_education
+WHERE gov_exp_pct_gdp IS  NULL
+  OR lit_rate_adult_pct IS NULL
+  OR pri_comp_rate_pct IS NULL
+  OR school_enrol_primary_pct IS NULL
+  OR pupil_teacher_primary IS NULL
+
+-- correlation GDP spent on education with literacy rates, enrollment rates, and completion rates.
+
+SELECT
+CORR(gov_exp_pct_gdp, lit_rate_adult_pct) AS corr_gov_exp_lit_rate,
+CORR(gov_exp_pct_gdp, school_enrol_primary_pct) AS corr_gov_exp_primary_enrol,
+CORR(gov_exp_pct_gdp, pri_comp_rate_pct) AS corr_gov_exp_completion_rate
+FROM world_education
+WHERE year >= (SELECT MAX(year) - 5 FROM world_education )
+
+-- income level as indicators 
+select 
+	case
+when gov_exp_pct_gdp < 3 then 'Low Income'
+when  gov_exp_pct_gdp between 3 and 6 then 'Middle Income'
+else 'High Income'
+	end as income_level ,
+AVG(lit_rate_adult_pct) AS avg_literacy,
+AVG(school_enrol_primary_pct) AS avg_enrollment
+from world_education
+WHERE year >= (SELECT MAX(year) - 5 FROM world_education )
+group by income_level
+
+--Explore the middle income by regions to see if specific continents or regions are driving the trends in middle-income literacy rates.
+select country,gov_exp_pct_gdp,
+lit_rate_adult_pct AS literacy_rates,
+school_enrol_primary_pct AS completion_rates 
+from world_education
+WHERE year >= (SELECT MAX(year) - 5 FROM world_education ) and  gov_exp_pct_gdp between 3 and 6
+group by country,gov_exp_pct_gdp, lit_rate_adult_pct,school_enrol_primary_pct 
+order by gov_exp_pct_gdp desc
+
+--pupil-teacher 
+select pupil_teacher_primary,
+lit_rate_adult_pct AS literacy_rates,
+school_enrol_primary_pct AS completion_rates
+FROM world_education
+WHERE year >= (SELECT MAX(year) - 5 FROM world_education )
+GROUP BY pupil_teacher_primary,lit_rate_adult_pct ,school_enrol_primary_pct
+ORDER BY pupil_teacher_primary asc
+limit 20
+
+--correlation between pupil-teacher ratio with literacy rates, enrollment rates, and completion rates. 
+ 
+SELECT
+CORR(pupil_teacher_primary, lit_rate_adult_pct) AS corr_pupil_ratio_lit_rate,
+CORR(pupil_teacher_primary, school_enrol_primary_pct) AS corr_pupil_ratio_primary_enrol,
+CORR(pupil_teacher_primary, pri_comp_rate_pct) AS corr_pupil_ratio_completion_rate
+FROM world_education
+WHERE year >= (SELECT MAX(year) - 5 FROM world_education )
+
+
